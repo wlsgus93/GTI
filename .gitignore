@@ -1,0 +1,76 @@
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# ===== Cursor backup =====
+.cursor.backup/
+.cursor/ecc-install-state.json
+
+# ===== Logs / Temp =====
+*.log
+*.tmp
+logs/
+tmp/
+
+# ===== Env =====
+.env
+.env.*
+!.env.example
+
+# ===== Frontend (Node / Vite) =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/.eslintcache
+
+# Root-level node_modules (legacy / leftover)
+node_modules/
+
+# ===== Backend (Java / Gradle) =====
+backend/.gradle/
+backend/build/
+backend/out/
+backend/bin/
+backend/!gradle/wrapper/gradle-wrapper.jar
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/HELP.md
+
+# Spring Boot
+backend/**/application-local.yml
+backend/**/application-local.yaml
+
+# ===== Docker volumes =====
+**/postgres-data/
+**/redis-data/
+
+# ===== Docs (로컬 작업 일지 + 설계 메모 — 버전 관리 X) =====
+docs/*
+# 세션 플랜/코드리뷰 기록은 버전 관리
+!docs/plan-code-review-session.md
+!docs/navigation-ia-update.md
+!docs/code-review-latest.md
+
+# ===== Cursor / Claude rules (로컬 ECC 룰 — 별도 리포로 관리) =====
+.cursor/rules/
+.cursor/agents/
+.cursor/commands/
+.cursor/hooks/
+.cursor/skills/
+.claude/*
+claude.md
+.cursor/.agents/
+.cursor/agents/
+.cursor/skills/
+.cursor/scripts/
+.cursor/hooks/
+.cursor/mcp-configs/
+.cursor/mcp.json
+.cursor/hooks.json
+.claude/
