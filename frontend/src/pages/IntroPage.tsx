@@ -1,7 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { useAuth } from "@/auth/AuthContext";
 import { EASE_OUT_EXPO } from "@/design/motion";
 
 /**
@@ -37,21 +36,21 @@ const STATS = [
   { value: "3-Layer", label: "Hybrid LLM" },
 ];
 
-export function IntroPage() {
-  const { isAuthenticated } = useAuth();
+type IntroPageProps = {
+  /**
+   * 시작하기 / 건너뛰기 클릭 시 호출 (제공 시 inline 모드 — AgentHomePage 안).
+   * 미제공 시 (기본) /signup 으로 navigate.
+   */
+  onComplete?: () => void;
+};
+
+export function IntroPage({ onComplete }: IntroPageProps = {}) {
   const reduced = useReducedMotion();
   // 재방문 (이미 본 사용자) 또는 모션 줄임 → frame 3 즉시
   const [skipped, setSkipped] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("gti.seen-intro") === "true";
   });
-
-  // 인증된 사용자 → 즉시 / 로 (이미 가입자 — 인트로 보고 싶으면 명시 진입)
-  useEffect(() => {
-    if (isAuthenticated) {
-      window.location.replace("/");
-    }
-  }, [isAuthenticated]);
 
   // intro 본 표시
   useEffect(() => {
@@ -75,11 +74,18 @@ export function IntroPage() {
       {/* mesh background — intro 전용 강화 */}
       <div className="intro-mesh-bg" aria-hidden="true" />
 
-      {/* skip 링크 — 우측 상단 */}
+      {/* skip 링크 — 우측 상단 (frame 3 점프 + onComplete 호출) */}
       {!skipped ? (
         <button
           type="button"
-          onClick={() => setSkipped(true)}
+          onClick={() => {
+            setSkipped(true);
+            // inline 모드 — 즉시 home 으로 (skip = 인트로 본 것으로 간주)
+            if (onComplete) {
+              window.localStorage.setItem("gti.seen-intro", "true");
+              setTimeout(onComplete, 200);
+            }
+          }}
           className="absolute right-6 top-6 z-10 text-xs text-[var(--color-ink-muted)] underline underline-offset-4 hover:text-[var(--color-ink)]"
         >
           건너뛰기 →
@@ -193,13 +199,29 @@ export function IntroPage() {
             ease: EASE_OUT_EXPO,
           }}
         >
-          <Link
-            to="/signup"
-            className="btn-micro group inline-flex items-center gap-2 rounded-[var(--radius-input)] bg-[var(--color-accent)] px-8 py-4 text-base font-semibold text-white shadow-2xl shadow-[var(--color-accent)]/30 transition hover:shadow-[var(--color-accent)]/50"
-          >
-            시작하기
-            <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
-          </Link>
+          {/* inline 모드 (onComplete 제공) → 버튼으로 즉시 home 전환
+              standalone 모드 → /signup 으로 navigate */}
+          {onComplete ? (
+            <button
+              type="button"
+              onClick={() => {
+                window.localStorage.setItem("gti.seen-intro", "true");
+                onComplete();
+              }}
+              className="btn-micro group inline-flex items-center gap-2 rounded-[var(--radius-input)] bg-[var(--color-accent)] px-8 py-4 text-base font-semibold text-white shadow-2xl shadow-[var(--color-accent)]/30 transition hover:shadow-[var(--color-accent)]/50"
+            >
+              시작하기
+              <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+            </button>
+          ) : (
+            <Link
+              to="/signup"
+              className="btn-micro group inline-flex items-center gap-2 rounded-[var(--radius-input)] bg-[var(--color-accent)] px-8 py-4 text-base font-semibold text-white shadow-2xl shadow-[var(--color-accent)]/30 transition hover:shadow-[var(--color-accent)]/50"
+            >
+              시작하기
+              <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+            </Link>
+          )}
           <Link
             to="/login"
             className="text-xs text-[var(--color-ink-muted)] underline underline-offset-4 hover:text-[var(--color-ink)]"

@@ -1,12 +1,13 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
 import { useAgentQuery } from "@/features/agent/hooks";
 import type { AgentResponse } from "@/features/agent/api";
 import { usePersonaTheme } from "@/design/PersonaThemeContext";
 import { EASE_OUT_EXPO, kineticChar, kineticContainer, staggerContainer, staggerItem } from "@/design/motion";
 import { PERSONA_THEMES } from "@/design/personaThemes";
+import { IntroPage } from "@/pages/IntroPage";
 import type { Persona } from "@/features/insight/api";
 
 /**
@@ -50,24 +51,34 @@ export function AgentHomePage() {
   const [response, setResponse] = useState<AgentResponse | null>(null);
   const { mutate, isPending, error } = useAgentQuery();
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  // W9 Phase E (재구성) — 단일 SPA: 첫 방문자는 같은 URL 안에서 intro → home 자연 전환
+  // localStorage gti.seen-intro 체크 → 재방문자는 intro skip
+  const [view, setView] = useState<"intro" | "home">(() => {
+    if (typeof window === "undefined") return "home";
+    return window.localStorage.getItem("gti.seen-intro") === "true" ? "home" : "intro";
+  });
 
-  // 미인증 시 → 무조건 /intro 로 (Navigate 컴포넌트 — 렌더 중 안전)
-  // intro 본 사용자는 IntroPage 의 "건너뛰기" 또는 "시작하기" 로 진행
-  if (!isAuthenticated) {
-    return <Navigate to="/intro" replace />;
-  }
+  useEffect(() => {
+    if (view === "home") inputRef.current?.focus();
+  }, [view]);
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
     const query = draft.trim();
     if (!query || isPending) return;
+    if (!isAuthenticated) {
+      // 미인증 사용자가 분석 시도 → 가입 유도
+      navigate("/signup");
+      return;
+    }
     mutate({ query }, { onSuccess: setResponse });
   };
 
   const handleExampleClick = (query: string) => {
+    if (!isAuthenticated) {
+      navigate("/signup");
+      return;
+    }
     setDraft(query);
     mutate({ query }, { onSuccess: setResponse });
   };
@@ -75,7 +86,29 @@ export function AgentHomePage() {
   const honorific = auth?.displayName ?? theme.honorific.replace(/님$/, "");
 
   return (
-    <div className="space-y-10">
+    <>
+      {/* W9 Phase E — Cinematic Intro overlay (첫 방문 시) → AnimatePresence fade out */}
+      <AnimatePresence mode="wait">
+        {view === "intro" ? (
+          <motion.div
+            key="intro"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.6, ease: EASE_OUT_EXPO }}
+            className="fixed inset-0 z-50 bg-[var(--color-surface)]"
+          >
+            <IntroPage onComplete={() => setView("home")} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <motion.div
+        key="home"
+        initial={view === "home" ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: view === "home" ? 0 : 0.2, ease: EASE_OUT_EXPO }}
+        className="space-y-10"
+      >
       {/* Hero */}
       <motion.header
         variants={kineticContainer}
@@ -144,9 +177,11 @@ export function AgentHomePage() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={
-              response
-                ? "꼬리질문하거나 새 분석 요청..."
-                : "예: '우리 인디 RPG 시장 분석', '광고 ROI 어디 쓸까?'"
+              !isAuthenticated
+                ? "가입 후 분석 시작 — 입력 시 자동으로 가입 페이지로 이동"
+                : response
+                  ? "꼬리질문하거나 새 분석 요청..."
+                  : "예: '우리 인디 RPG 시장 분석', '광고 ROI 어디 쓸까?'"
             }
             disabled={isPending}
             className="flex-1 rounded-l-[var(--radius-card)] bg-transparent px-4 py-4 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none disabled:opacity-50"
@@ -277,9 +312,9 @@ export function AgentHomePage() {
           </div>
         </motion.section>
       ) : null}
-    </div>
+      </motion.div>
+    </>
   );
 }
 
-
-// W9 Phase E — UnauthenticatedHero 제거. 미인증은 무조건 /intro 로 redirect.
+// W9 Phase E — 단일 SPA: AgentHomePage 안에서 intro → home AnimatePresence 전환.
