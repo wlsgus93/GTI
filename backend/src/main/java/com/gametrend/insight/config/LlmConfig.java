@@ -4,6 +4,7 @@ import com.gametrend.insight.application.insight.LlmClient;
 import com.gametrend.insight.infrastructure.llm.AnthropicLlmClient;
 import com.gametrend.insight.infrastructure.llm.GeminiLlmClient;
 import com.gametrend.insight.infrastructure.llm.GeminiProperties;
+import com.gametrend.insight.infrastructure.llm.GeminiVisionClient;
 import com.gametrend.insight.infrastructure.llm.GeminiWebClientConfig;
 import com.gametrend.insight.infrastructure.llm.GroqLlmClient;
 import com.gametrend.insight.infrastructure.llm.GroqProperties;
@@ -103,5 +104,18 @@ public class LlmConfig {
     @ConditionalOnMissingBean(LlmClient.class)
     public LlmClient stubLlmClient() {
         return new StubLlmClient();
+    }
+
+    /**
+     * Gemini Vision 전용 client (D3 그래픽 성향) — provider 가 gemini 또는 router 일 때만 활성.
+     * 텍스트 LlmClient 와 별개 — Vision 호출 schema 가 다른 multipart (text + inline_data).
+     */
+    @Bean
+    @ConditionalOnProperty(name = "gti.llm.provider", havingValue = "router", matchIfMissing = false)
+    public GeminiVisionClient geminiVisionClientForRouter(
+            @Qualifier(GeminiWebClientConfig.GEMINI_WEB_CLIENT) WebClient geminiWebClient,
+            WebClient.Builder builder,
+            GeminiProperties props) {
+        return new GeminiVisionClient(geminiWebClient, builder, props);
     }
 }
