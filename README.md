@@ -51,7 +51,6 @@ npm run dev
 ### 협업 / 메타
 - [Cursor Commands](docs/cursor-commands.md) — ECC 슬래시 커맨드 사용 가이드
 - [ECC vs Plain](docs/ecc-vs-plain.md) — 플레인 vs ECC 비교
-- [Portfolio Cases](docs/portfolio/README.md) — STAR-D 형식 포트폴리오 케이스
 
 ## 기술 스택
 
