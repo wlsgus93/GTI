@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ErrorBox } from "@/components/AsyncState";
-import { PersonaSwitcher } from "@/components/ui/PersonaSwitcher";
 import { Card } from "@/components/ui/Card";
 import { useRegister } from "@/features/auth/hooks";
 
+/**
+ * W9 옵션 C — Agentic UX:
+ * 페르소나 카드 4개 강제 선택 제거. 가입 후 onboarding 대화에서 시스템이 자동 추론.
+ * 가입은 이메일/비밀번호/표시이름 만 — 최소 정보.
+ */
 export function SignupPlaceholderPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -16,7 +20,8 @@ export function SignupPlaceholderPage() {
     e.preventDefault();
     register.mutate(
       { email, password, displayName },
-      { onSuccess: () => navigate("/", { replace: true }) },
+      // W9 옵션 C — 가입 직후 onboarding 대화로 (페르소나 자동 추론 시작점)
+      { onSuccess: () => navigate("/onboarding", { replace: true }) },
     );
   };
 
@@ -34,7 +39,7 @@ export function SignupPlaceholderPage() {
         </Link>
         <h1 className="mt-3 text-xl font-bold text-[var(--color-ink)]">회원가입</h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          가입 즉시 JWT 발급 — 자동 로그인
+          가입 즉시 자동 로그인 — 에이전트가 첫 대화로 당신의 관점을 자동 파악합니다
         </p>
 
         <label className="mt-5 block text-sm">
@@ -72,18 +77,6 @@ export function SignupPlaceholderPage() {
           />
         </label>
 
-        <div className="mt-5 border-t border-[var(--color-line)] pt-4">
-          <p className="text-[var(--text-meta)] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-            페르소나 선택 (지금 또는 가입 후 변경 가능)
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-subtle)]">
-            모든 페이지·LLM 응답이 페르소나 톤·우선 KPI에 맞춰 분기됩니다.
-          </p>
-          <div className="mt-3">
-            <PersonaSwitcher variant="detail" />
-          </div>
-        </div>
-
         {register.isError ? (
           <div className="mt-3">
             <ErrorBox error={register.error} />
@@ -93,7 +86,7 @@ export function SignupPlaceholderPage() {
         <button
           type="submit"
           disabled={register.isPending}
-          className="mt-5 w-full rounded-[var(--radius-input)] bg-[var(--color-accent)] py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="btn-micro mt-5 w-full rounded-[var(--radius-input)] bg-[var(--color-accent)] py-2 text-sm font-medium text-white shadow-md disabled:opacity-50"
         >
           {register.isPending ? "가입 중…" : "회원가입"}
         </button>
@@ -110,9 +103,9 @@ export function SignupPlaceholderPage() {
 
       <Card variant="sunken" className="max-w-md">
         <p className="text-[var(--text-meta)] text-[var(--color-ink-muted)]">
-          GTI 는 게임 산업 종사자 4 페르소나 (인디·퍼블리셔·마케터·투자자) 모두를 동등 지원합니다.
-          페르소나 전환은 언제든 가능 — 헤더 PersonaSwitcher 또는 CommandBar (Cmd+K) 의{" "}
-          <span className="font-data">/persona</span> 명령.
+          가입 후 에이전트가 짧은 대화로 당신의 관점을 자동 파악합니다.
+          <br />
+          관점 (인디·퍼블리셔·마케터·투자자) 은 언제든 헤더 뱃지로 명시 변경 가능.
         </p>
       </Card>
     </div>

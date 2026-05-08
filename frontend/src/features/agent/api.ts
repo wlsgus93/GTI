@@ -27,6 +27,10 @@ export type AgentResponse = {
   completionTokens: number;
   cached: boolean;
   latencyMs: number;
+  /** W9 옵션 C — Agentic UX. 응답 시점의 chat_session.persona (자동 추론 결과) */
+  activePersona: Persona | null;
+  /** true = 이번 query 에서 페르소나 자동 추론됨 (UI 가 mesh morph 트리거) */
+  personaInferred: boolean;
 };
 
 export function postAgentQuery(req: AgentRequest): Promise<AgentResponse> {
