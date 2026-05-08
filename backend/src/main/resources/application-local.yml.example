@@ -1,0 +1,33 @@
+# 로컬 개발용 시크릿 / override.
+# 이 파일을 application-local.yml로 복사 후 실제 값 채워서 사용.
+# application-local.yml은 .gitignore되어 있음.
+#
+# 활성화: -Dspring.profiles.active=local 또는 SPRING_PROFILES_ACTIVE=local
+
+spring:
+  datasource:
+    password: gti
+  ai:
+    anthropic:
+      api-key: sk-ant-...
+
+gti:
+  external:
+    steam:
+      api-key: YOUR_STEAM_API_KEY
+    twitch:
+      client-id: YOUR_TWITCH_CLIENT_ID
+      client-secret: YOUR_TWITCH_CLIENT_SECRET
+    youtube:
+      api-key: YOUR_YOUTUBE_API_KEY
+    reddit:
+      client-id: YOUR_REDDIT_CLIENT_ID
+      client-secret: YOUR_REDDIT_CLIENT_SECRET
+      user-agent: "gti/0.1 by your-username"
+    opencritic:
+      api-key: YOUR_OPENCRITIC_API_KEY  # optional
+
+logging:
+  level:
+    com.gametrend.insight: DEBUG
+    org.springframework.web.reactive.function.client: DEBUG  # WebClient 호출 trace

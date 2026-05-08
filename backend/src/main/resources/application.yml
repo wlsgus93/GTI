@@ -1,0 +1,169 @@
+spring:
+  application:
+    name: gti
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gti}
+    username: ${DB_USER:gti}
+    password: ${DB_PASSWORD:gti}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: claude-opus-4-5
+          max-tokens: 4096
+          temperature: 0.7
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# GTI 통합 config (LLM provider + external sources + JWT)
+gti:
+  llm:
+    # provider toggle: router (Gemini HIGH + Groq FAST) | gemini | groq | ollama | anthropic | stub
+    provider: ${LLM_PROVIDER:stub}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      base-url: https://generativelanguage.googleapis.com/v1beta
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      timeout-ms: 30000
+      temperature: 0.7
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      base-url: https://api.groq.com/openai/v1
+      model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+      timeout-ms: 15000
+      temperature: 0.5
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model: ${OLLAMA_MODEL:qwen2.5:7b-instruct-q4_K_M}
+      timeout-ms: 60000
+      temperature: 0.7
+  jwt:
+    # 운영에서 반드시 환경변수로 교체 — 32 바이트 이상 (256 bit) 권장
+    secret: ${JWT_SECRET:dev-only-secret-change-in-prod-at-least-32-bytes-long-please}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+    issuer: gametrend-insight
+  external:
+    steam:
+      base-url: https://api.steampowered.com
+      storefront-url: https://store.steampowered.com/api
+      api-key: ${STEAM_API_KEY:}
+      timeout-ms: 5000
+      retry:
+        max-attempts: 3
+        backoff-ms: 1000
+    igdb:
+      base-url: https://api.igdb.com/v4
+    twitch:
+      base-url: https://api.twitch.tv/helix
+      oauth-url: https://id.twitch.tv/oauth2/token
+      client-id: ${TWITCH_CLIENT_ID:}
+      client-secret: ${TWITCH_CLIENT_SECRET:}
+    youtube:
+      base-url: https://www.googleapis.com/youtube/v3
+      api-key: ${YOUTUBE_API_KEY:}
+    reddit:
+      # OAuth 모드 (Builder Policy 통과 + script app 등록 후)
+      base-url: https://oauth.reddit.com
+      oauth-url: https://www.reddit.com/api/v1/access_token
+      # Anonymous 모드 (default — Builder Policy 검토 대기 시 즉시 가능)
+      anonymous-base-url: https://www.reddit.com
+      use-oauth: ${REDDIT_USE_OAUTH:false}
+      client-id: ${REDDIT_CLIENT_ID:}
+      client-secret: ${REDDIT_CLIENT_SECRET:}
+      user-agent: ${REDDIT_USER_AGENT:gti-game-trend-insight/1.0 (anonymous research)}
+    opencritic:
+      base-url: https://api.opencritic.com/api
+      api-key: ${OPENCRITIC_API_KEY:}
+    steamspy:
+      base-url: https://steamspy.com/api.php
+    apple-charts:
+      # iTunes legacy RSS — server-side 게임 카테고리 필터 (genre=6014) 지원.
+      # v2 spec (rss.marketingtools.apple.com) 은 응답에 genres:[] 빈 배열 + query genre 무시 → legacy 사용.
+      base-url: https://itunes.apple.com
+    google-play:
+      # crawler-service (별도 Node.js 마이크로서비스 — google-play-scraper 호출)
+      base-url: ${CRAWLER_SERVICE_URL:http://localhost:3001}
+      timeout-ms: 10000
+
+# Resilience4j 회로 차단기 — 모든 외부 소스에 default config 적용
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50      # 50% 실패 → OPEN
+        waitDurationInOpenState: 30s   # OPEN 상태 지속 시간
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - com.gametrend.insight.infrastructure.external.common.ExternalApiException$Server
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - com.gametrend.insight.infrastructure.external.common.ExternalApiException$Client
+          - com.gametrend.insight.infrastructure.external.common.ExternalApiException$RateLimit
+      llm:
+        # Anthropic API용 별도 config (W3 D1).
+        # ext API보다 타임아웃 길고 (LLM 호출 1~3s), 실패 임계 더 보수적.
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60s   # Anthropic 장애 보통 짧음, 1분 후 재시도
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # 모든 RuntimeException 기록 (Anthropic 장애는 다양한 형태로 도착 — connection, timeout, 5xx)
+        # 이전 지시 명확화: ignoreExceptions만 명시, recordExceptions 비우면 모든 예외 기록
+        ignoreExceptions:
+          - java.lang.IllegalArgumentException                  # 우리 코드 버그 — breaker 영향 X
+          - com.gametrend.insight.application.game.GameNotFoundException
+    instances:
+      llm:
+        baseConfig: llm
+
+logging:
+  level:
+    root: INFO
+    com.gametrend.insight: DEBUG
+    org.hibernate.SQL: DEBUG
