@@ -1,312 +1,330 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { motion } from "framer-motion";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
-import { ErrorBox, Empty, Loading } from "@/components/AsyncState";
-import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
-import { CommandBar } from "@/components/ui/CommandBar";
-import { Hero } from "@/components/ui/Hero";
-import { PersonaSwitcher } from "@/components/ui/PersonaSwitcher";
-import { Stat } from "@/components/ui/Stat";
+import { useAgentQuery } from "@/features/agent/hooks";
+import type { AgentResponse } from "@/features/agent/api";
 import { usePersonaTheme } from "@/design/PersonaThemeContext";
-import { useTrends } from "@/features/trend/hooks";
-import { useMultiInsight } from "@/features/insight/hooks";
+import { EASE_OUT_EXPO, kineticChar, kineticContainer, staggerContainer, staggerItem } from "@/design/motion";
+import { PERSONA_THEMES } from "@/design/personaThemes";
 import type { Persona } from "@/features/insight/api";
-import { fmtCompact, fmtPct, fmtRelative } from "@/lib/format";
 
 /**
- * AgentHomePage — 에이전트 우선 진입점.
+ * AgentHomePage — 풀 Agentic 진입점 (W9 옵션 B).
+ *
+ * 진정한 "검색창 X — 에이전트 시작" 구현:
+ * - 큰 Hero (페르소나별 호칭 자동)
+ * - 큰 CommandBar 중앙 (focus + glow-accent)
+ * - 4 예시 chip (페르소나 시그널 자연 노출)
+ * - 응답 inline (latest only — 누적은 AgentPanel)
+ * - 데이터 풍부 페이지는 quick link 로 위임 (/discover, /compare, /watchlist 등)
  *
  * 룰 정합:
- * - `15-agentic-ux.mdc` 의 "검색창 X — 에이전트 시작" 철학 → CommandBar 핵심
- * - `00-project-overview.mdc` 4 페르소나 동등 → Hero 호칭/톤이 페르소나 따라 변화
- * - `web/design-quality.md` editorial / bento → 비대칭 grid (top game wide / 비교·워치 narrow)
- * - `90-data-analyst-persona.mdc` Confidence/cached 메타 시각화
+ * - `15-agentic-ux.mdc` "검색창 X — 에이전트 시작" 진정한 구현 ★
+ * - `00-project-overview.mdc` 4 페르소나 동등 (자동 추론, 명시 X)
+ * - `91-data-analyst-persona-global.mdc` Option E LLM 동적 분기
  */
-export function AgentHomePage() {
-  const { auth, isAuthenticated } = useAuth();
-  const { theme, persona } = usePersonaTheme();
-  const trends = useTrends(8);
 
-  const top = trends.data?.content[0];
-  const featuredId = top?.id;
-  const upCount = trends.data?.content.filter((g) => (g.ccuDeltaPct ?? 0) > 0).length ?? 0;
+const EXAMPLES: { label: string; query: string; emoji: string }[] = [
+  { emoji: "🎮", label: "우리 인디 RPG 출시 시기", query: "우리 인디 RPG 출시 시기 추천해줘" },
+  { emoji: "📈", label: "광고 채널 ROI 비교", query: "다음 분기 광고 캠페인 채널 우선순위 — ROI 기준" },
+  { emoji: "🎯", label: "슈팅 게임 시장 동향", query: "Counter-Strike 2 같은 슈팅 게임 시장 동향" },
+  { emoji: "💼", label: "신작 투자 리스크 평가", query: "신작 게임 투자 리스크 + 성공 확률" },
+];
+
+const QUICK_LINKS: { label: string; hint: string; to: string; icon: string }[] = [
+  { icon: "📊", label: "트렌드 보드", hint: "TrendScore Top N", to: "/discover" },
+  { icon: "🎮", label: "게임 상세", hint: "6 탭 (CCU·리뷰·커뮤니티·시청·D5·Compare)", to: "/games/1" },
+  { icon: "🔀", label: "비교 분석", hint: "여러 게임 7 차원 비교", to: "/workspace/compare" },
+  { icon: "📌", label: "워치리스트", hint: "관심 게임 모니터", to: "/workspace/watchlist" },
+  { icon: "💸", label: "MoneyCalc", hint: "Monte Carlo 시뮬", to: "/workspace/moneycalc" },
+  { icon: "🧪", label: "Pretotyping 검증", hint: "P7 자극물 4 케이스", to: "/verification" },
+];
+
+export function AgentHomePage() {
+  const navigate = useNavigate();
+  const { auth, isAuthenticated } = useAuth();
+  const { theme } = usePersonaTheme();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState("");
+  const [response, setResponse] = useState<AgentResponse | null>(null);
+  const { mutate, isPending, error } = useAgentQuery();
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // 미인증 시 가입 유도
+  if (!isAuthenticated) {
+    return <UnauthenticatedHero />;
+  }
+
+  const handleSubmit = (e?: FormEvent) => {
+    e?.preventDefault();
+    const query = draft.trim();
+    if (!query || isPending) return;
+    mutate({ query }, { onSuccess: setResponse });
+  };
+
+  const handleExampleClick = (query: string) => {
+    setDraft(query);
+    mutate({ query }, { onSuccess: setResponse });
+  };
+
+  const honorific = auth?.displayName ?? theme.honorific.replace(/님$/, "");
 
   return (
-    <div className="space-y-[var(--space-section)]">
-      <Hero
-        eyebrow={`Game-Agent · ${theme.label}`}
-        title={
-          isAuthenticated ? (
-            <>
-              {auth?.displayName ?? auth?.email} {theme.honorific.replace(/님$/, "님")},<br />
-              오늘의 시장은 어떻게 움직이고 있을까요?
-            </>
+    <div className="space-y-10">
+      {/* Hero */}
+      <motion.header
+        variants={kineticContainer}
+        initial="hidden"
+        animate="visible"
+        className="space-y-3 pt-4 text-center"
+      >
+        <motion.p
+          variants={kineticChar}
+          className="text-[var(--text-meta)] font-semibold uppercase tracking-[0.18em] text-[var(--color-accent-strong)]"
+        >
+          GTI · Game-Agent · {theme.label}
+        </motion.p>
+        <motion.h1
+          variants={kineticChar}
+          className="kinetic-text text-[clamp(2rem,1.4rem+2.5vw,3.5rem)] font-bold leading-[1.05] tracking-tight"
+        >
+          {response ? (
+            <>분석 결과를 확인하시고,<br />다음 질문을 던져보세요</>
           ) : (
-            <>
-              {theme.honorific}, <span className="text-accent">에이전트</span>와 함께<br />
-              오늘의 시장을 한 번에 보세요
-            </>
-          )
-        }
-        subtitle={theme.tone}
-        accentBackground
-        trailing={
-          <div className="flex flex-col items-end gap-2 text-right">
-            {trends.data ? (
-              <Badge tone="accent" mono>
-                상승 {upCount}/{trends.data.totalElements} 게임
-              </Badge>
+            <>{honorific}{theme.honorific.endsWith("님") ? "님" : ""},<br />오늘 어떤 도움이 필요하세요?</>
+          )}
+        </motion.h1>
+        {!response ? (
+          <motion.p variants={kineticChar} className="text-[var(--color-ink-muted)]">
+            자유롭게 질문하시면, 에이전트가 9 데이터 소스에서 답을 만들어 드립니다.
+          </motion.p>
+        ) : null}
+      </motion.header>
+
+      {/* 4 예시 chip — 응답 전에만 노출 */}
+      {!response ? (
+        <motion.div
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          {EXAMPLES.map((ex) => (
+            <motion.button
+              key={ex.query}
+              variants={staggerItem}
+              type="button"
+              onClick={() => handleExampleClick(ex.query)}
+              disabled={isPending}
+              className="glass-card text-left disabled:opacity-50"
+            >
+              <span className="text-2xl">{ex.emoji}</span>
+              <span className="mt-2 block text-sm font-medium text-[var(--color-ink)]">
+                {ex.label}
+              </span>
+            </motion.button>
+          ))}
+        </motion.div>
+      ) : null}
+
+      {/* 큰 CommandBar 중앙 */}
+      <form
+        onSubmit={handleSubmit}
+        className="glow-accent rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface-raised)]/80 p-1 backdrop-blur-md transition-all"
+      >
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={
+              response
+                ? "꼬리질문하거나 새 분석 요청..."
+                : "예: '우리 인디 RPG 시장 분석', '광고 ROI 어디 쓸까?'"
+            }
+            disabled={isPending}
+            className="flex-1 rounded-l-[var(--radius-card)] bg-transparent px-4 py-4 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={isPending || !draft.trim()}
+            className="btn-micro mr-1 rounded-[var(--radius-input)] bg-[var(--color-accent)] px-5 py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+          >
+            {isPending ? "분석 중…" : "전송"}
+          </button>
+        </div>
+      </form>
+
+      {/* 에러 */}
+      {error ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400"
+        >
+          {error.message}
+        </motion.div>
+      ) : null}
+
+      {/* 응답 inline (latest only — 이력은 AgentPanel) */}
+      {response ? (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: EASE_OUT_EXPO }}
+          className="space-y-4"
+        >
+          <div className="glass-card whitespace-pre-wrap text-[var(--color-ink)]">
+            {response.content}
+          </div>
+
+          {/* 메타 + 추론된 페르소나 */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {response.activePersona ? (
+              <span className="rounded-full border border-[var(--color-accent)]/30 bg-[var(--color-accent-soft)]/40 px-3 py-1 text-[var(--color-accent-strong)]">
+                관점: <strong>{PERSONA_THEMES[response.activePersona as Persona].label}</strong>
+                {response.personaInferred ? " (자동 추론)" : ""}
+              </span>
             ) : null}
-            {!isAuthenticated ? (
-              <Link
-                to="/signup"
-                className="rounded-[var(--radius-input)] bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+            {response.classifierBlocked ? (
+              <span className="rounded bg-amber-500/20 px-2 py-1 text-amber-400">
+                Layer 1 차단 · 0 tokens
+              </span>
+            ) : (
+              <>
+                {response.model ? (
+                  <span className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-[var(--color-ink-muted)]">
+                    {response.model}
+                  </span>
+                ) : null}
+                <span className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-[var(--color-ink-muted)]">
+                  {response.promptTokens + response.completionTokens} tok
+                </span>
+              </>
+            )}
+            <span className="rounded bg-[var(--color-surface-sunken)] px-2 py-1 text-[var(--color-ink-muted)]">
+              {response.latencyMs}ms
+            </span>
+          </div>
+
+          {/* 다음 액션 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResponse(null);
+                setDraft("");
+                inputRef.current?.focus();
+              }}
+              className="btn-micro rounded-[var(--radius-input)] border border-[var(--color-line)] px-4 py-2 text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+            >
+              ← 새 질문
+            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => navigate("/discover")}
+                className="btn-micro rounded-[var(--radius-input)] bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white shadow-md"
               >
-                회원가입 →
-              </Link>
-            ) : null}
-          </div>
-        }
-      />
-
-      <CommandBar />
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        {/* Featured top game — 큰 카드 (lg:col-span-2) */}
-        <FeaturedGameCard
-          id={featuredId}
-          title={top?.title}
-          ccu={top?.concurrentPlayers}
-          delta={top?.ccuDeltaPct ?? null}
-          score={top?.trendScore}
-          loading={trends.isLoading}
-          error={trends.error}
-          onRetry={() => trends.refetch()}
-        />
-
-        {/* 페르소나 상세 카드 */}
-        <Card variant="raised" className="lg:col-span-1">
-          <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-[var(--text-meta)] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-                현재 페르소나
-              </p>
-              <p className="mt-1 text-xl font-semibold text-[var(--color-ink)]">{theme.label}</p>
-              <p className="mt-1 text-xs text-[var(--color-ink-muted)]">{theme.visualHint}</p>
+                트렌드 보드 →
+              </button>
             </div>
-            <PersonaSwitcher variant="detail" />
-            <p className="text-xs text-[var(--color-ink-subtle)]">
-              모든 페이지·LLM 응답이 페르소나에 맞춰 분기됩니다.
-            </p>
           </div>
-        </Card>
-      </section>
+        </motion.div>
+      ) : null}
 
-      <MultiPersonaPreview gameId={featuredId} initialPersonas={["INDIE", persona].filter((v, i, arr) => arr.indexOf(v) === i) as Persona[]} />
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        <QuickAction
-          title="트렌드 보드"
-          subtitle="9 소스 통합 TrendScore Top N"
-          href="/discover"
-        />
-        <QuickAction
-          title="게임 비교"
-          subtitle="Virtual Threads 병렬 비교"
-          href="/workspace/compare?ids=730,1245620"
-        />
-        <QuickAction
-          title="MoneyCalc"
-          subtitle="3 시나리오 + Monte Carlo"
-          href="/workspace/money-calc"
-        />
-      </section>
+      {/* Quick links — 데이터 풍부 페이지로 위임 */}
+      {!response ? (
+        <motion.section
+          aria-labelledby="quick-links-heading"
+          className="space-y-3 pt-6"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <h2
+            id="quick-links-heading"
+            className="text-[var(--text-meta)] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-muted)]"
+          >
+            바로 가기 — 깊이 있는 데이터 분석
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {QUICK_LINKS.map((q) => (
+              <motion.div key={q.to} variants={staggerItem}>
+                <Link
+                  to={q.to}
+                  className="glass-card flex items-start gap-3 transition hover:border-[var(--color-accent)]/50"
+                >
+                  <span className="text-2xl">{q.icon}</span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-semibold text-[var(--color-ink)]">
+                      {q.label}
+                    </span>
+                    <span className="block text-xs text-[var(--color-ink-muted)]">
+                      {q.hint}
+                    </span>
+                  </span>
+                  <span aria-hidden className="text-[var(--color-ink-subtle)]">→</span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+      ) : null}
     </div>
   );
 }
 
-type FeaturedProps = {
-  id: string | undefined;
-  title: string | undefined;
-  ccu: number | undefined;
-  delta: number | null;
-  score: number | undefined;
-  loading: boolean;
-  error: unknown;
-  onRetry: () => void;
-};
-
-function FeaturedGameCard({ id, title, ccu, delta, score, loading, error, onRetry }: FeaturedProps) {
-  if (loading) {
-    return (
-      <Card variant="raised" className="lg:col-span-2">
-        <Loading label="오늘의 Top 게임 불러오는 중…" />
-      </Card>
-    );
-  }
-  if (error) {
-    return (
-      <Card variant="raised" className="lg:col-span-2">
-        <ErrorBox error={error} onRetry={onRetry} />
-      </Card>
-    );
-  }
-  if (!id) {
-    return (
-      <Card variant="raised" className="lg:col-span-2">
-        <Empty
-          label="아직 수집된 게임이 없습니다"
-          hint="ingestion 잡을 1회 실행하면 시드 게임 10개가 적재됩니다"
-        />
-      </Card>
-    );
-  }
+/** 미인증 사용자용 hero — 가입 유도 */
+function UnauthenticatedHero() {
+  const { theme } = usePersonaTheme();
   return (
-    <Card variant="hero" accent className="lg:col-span-2">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[var(--text-meta)] font-semibold uppercase tracking-[0.12em] text-accent">
-              오늘의 Top
-            </p>
-            <Link
-              to={`/games/${id}`}
-              className="mt-1 block text-3xl font-bold leading-tight text-[var(--color-ink)] hover:underline"
-            >
-              {title}
-            </Link>
-          </div>
-          <Badge tone="accent" mono>
-            TS {score?.toFixed(1)}
-          </Badge>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label="현재 CCU" value={fmtCompact(ccu)} hint="Steam 실시간" />
-          <Stat
-            label="24h 변화"
-            value={delta === null ? "—" : fmtPct(delta)}
-            tone={delta === null ? "neutral" : delta >= 0 ? "up" : "down"}
-            hint="EWMA 권장 (W4+)"
-          />
-          <Stat label="appId" value={id} mono />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            to={`/games/${id}?tab=ai`}
-            className="rounded-[var(--radius-input)] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white"
-          >
-            AI 인사이트 받기 →
-          </Link>
-          <Link
-            to={`/workspace/compare?ids=${id}`}
-            className="rounded-[var(--radius-input)] border border-[var(--color-line-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)]"
-          >
-            비교에 추가
-          </Link>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function MultiPersonaPreview({ gameId, initialPersonas }: { gameId: string | undefined; initialPersonas: Persona[] }) {
-  const [shouldRun, setShouldRun] = useState(false);
-  const [personas] = useState<Persona[]>(initialPersonas);
-  const insights = useMultiInsight(shouldRun ? gameId : undefined, personas);
-
-  if (!gameId) {
-    return null;
-  }
-
-  return (
-    <Card variant="raised">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[var(--text-meta)] font-semibold uppercase tracking-wide text-[var(--color-ink-muted)]">
-            멀티 페르소나 인사이트
-          </p>
-          <p className="mt-1 text-lg font-semibold text-[var(--color-ink)]">
-            한 번에 {personas.length}개 페르소나 관점으로 분석
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">
-            Virtual Threads 병렬 호출 — wallClock = max(per-persona latency)
-          </p>
-        </div>
-        <button
-          type="button"
-          disabled={insights.isFetching}
-          onClick={() => setShouldRun(true)}
-          className="rounded-[var(--radius-input)] bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+    <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-6 text-center">
+      <motion.h1
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: EASE_OUT_EXPO }}
+        className="kinetic-text text-[clamp(2rem,1.4rem+3vw,4rem)] font-bold leading-[1.05] tracking-tight"
+      >
+        게임 시장 분석<br />에이전트와 함께
+      </motion.h1>
+      <motion.p
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.4, ease: EASE_OUT_EXPO }}
+        className="max-w-md text-[var(--color-ink-muted)]"
+      >
+        9 소스 데이터 · 4 이해관계자 관점 · LLM 인사이트.
+        <br />
+        가입 후 자연어로 질문하면 시스템이 당신의 관점을 자동 파악합니다.
+      </motion.p>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4, ease: EASE_OUT_EXPO }}
+        className="flex gap-3"
+      >
+        <Link
+          to="/signup"
+          className="btn-micro rounded-[var(--radius-input)] bg-[var(--color-accent)] px-6 py-3 text-sm font-semibold text-white shadow-lg"
         >
-          {insights.isFetching ? "병렬 호출 중…" : "분석 실행"}
-        </button>
-      </div>
-
-      {shouldRun ? (
-        insights.isLoading ? (
-          <div className="mt-4">
-            <Loading label="Claude 멀티 페르소나 호출 — 첫 호출 5~15초" />
-          </div>
-        ) : insights.isError ? (
-          <div className="mt-4">
-            <ErrorBox error={insights.error} onRetry={() => insights.refetch()}>
-              <p className="mt-2 text-xs">
-                503 시: backend `.env` 에 ANTHROPIC_API_KEY 설정 필요 (docs/api-keys-guide.md)
-              </p>
-            </ErrorBox>
-          </div>
-        ) : insights.data ? (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center gap-3 text-xs">
-              <Badge tone="accent" mono>
-                wallClock {insights.data.totalLatencyMs}ms
-              </Badge>
-              <span className="text-[var(--color-ink-muted)]">{fmtRelative(insights.data.respondedAt)}</span>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-2">
-              {insights.data.perspectives.map((p) => (
-                <Card key={p.persona} variant="surface">
-                  <div className="flex items-center gap-2">
-                    <Badge tone="accent" mono>
-                      {p.personaLabel}
-                    </Badge>
-                    <Badge tone={p.cached ? "cached" : "fresh"} dot>
-                      {p.cached ? "cached" : "fresh"}
-                    </Badge>
-                    {p.stale ? (
-                      <Badge tone="stale" dot>
-                        stale
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 line-clamp-6 whitespace-pre-line text-sm leading-relaxed text-[var(--color-ink)]">
-                    {p.summary}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : null
-      ) : (
-        <p className="mt-4 text-xs text-[var(--color-ink-subtle)]">
-          페르소나를 바꿔 가며 같은 게임에 대한 다른 관점을 비교할 수 있습니다.
-        </p>
-      )}
-    </Card>
-  );
-}
-
-function QuickAction({ title, subtitle, href }: { title: string; subtitle: string; href: string }) {
-  return (
-    <Link
-      to={href}
-      className="group block rounded-[var(--radius-card)] border border-[var(--color-line)] bg-[var(--color-surface-raised)] p-4 transition hover:border-[var(--color-accent)]"
-    >
-      <p className="text-sm font-semibold text-[var(--color-ink)] transition group-hover:text-[var(--color-accent-strong)]">
-        {title} →
+          시작하기 →
+        </Link>
+        <Link
+          to="/login"
+          className="btn-micro rounded-[var(--radius-input)] border border-[var(--color-line)] px-6 py-3 text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+        >
+          로그인
+        </Link>
+      </motion.div>
+      <p className="text-xs text-[var(--color-ink-subtle)]">
+        현재 기본 관점: <span className="text-[var(--color-accent-strong)]">{theme.label}</span>
       </p>
-      <p className="mt-1 text-xs text-[var(--color-ink-muted)]">{subtitle}</p>
-    </Link>
+    </div>
   );
 }
