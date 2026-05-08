@@ -2,6 +2,7 @@ package com.gametrend.insight.application.agent;
 
 import com.gametrend.insight.application.agent.IntentClassifier.Intent;
 import com.gametrend.insight.application.agent.IntentClassifier.Topic;
+import com.gametrend.insight.domain.insight.Persona;
 
 /**
  * Agent 응답 — Layer 1 분류 결과 + Layer 3 cloud LLM 응답 (또는 hardcoded).
@@ -17,6 +18,8 @@ import com.gametrend.insight.application.agent.IntentClassifier.Topic;
  * @param completionTokens  cloud 호출 시 output tokens
  * @param cached            L1/L2 캐시 hit 여부
  * @param latencyMs         전체 latency (분류 + 컨텍스트 + cloud)
+ * @param activePersona     이 응답 생성 시점의 chat_session.persona (W9 옵션 C — 자동 추론 결과)
+ * @param personaInferred   true = 이번 query 에서 페르소나 자동 추론됨 (UI 가 morph 트리거 가능)
  */
 public record AgentResponse(
         Long sessionId,
@@ -29,11 +32,13 @@ public record AgentResponse(
         Integer promptTokens,
         Integer completionTokens,
         boolean cached,
-        long latencyMs) {
+        long latencyMs,
+        Persona activePersona,
+        boolean personaInferred) {
 
     public static AgentResponse blocked(Long sessionId, Long messageId, String content,
-            Topic topic, Intent intent, long latencyMs) {
+            Topic topic, Intent intent, long latencyMs, Persona persona) {
         return new AgentResponse(sessionId, messageId, content, topic, intent, true,
-                null, 0, 0, false, latencyMs);
+                null, 0, 0, false, latencyMs, persona, false);
     }
 }

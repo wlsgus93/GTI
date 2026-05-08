@@ -1,5 +1,8 @@
 package com.gametrend.insight.infrastructure.agent;
 
+import com.gametrend.insight.domain.insight.Persona;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -27,6 +30,29 @@ public final class HardcodedSmallTalkFilter {
     private static final Set<String> META_KEYWORDS = Set.of(
             "이 도구", "이 서비스", "GTI", "gti", "어떻게 사용", "how to use",
             "뭘 할 수", "뭘 해", "도움말", "help", "기능", "사용법");
+
+    /**
+     * W9 옵션 C — 페르소나 시그널 키워드 매트릭스 (한국어 + 영어).
+     *
+     * <p>매칭 우선순위 (LinkedHashMap insertion order):
+     * INVESTOR > MARKETER > PUBLISHER > INDIE.
+     * INDIE 키워드 ("내 게임" 등) 가 광범위라 fallback.
+     */
+    private static final Map<Persona, Set<String>> PERSONA_SIGNALS = new LinkedHashMap<>() {{
+        put(Persona.INVESTOR, Set.of(
+                "투자", "투자자", "리스크", "성공 확률", "시장 점유", "BEP", "ROI",
+                "수익", "벤처", "엑싯", "exit", "investment", "investor", "valuation"));
+        put(Persona.MARKETER, Set.of(
+                "캠페인", "광고", "마케팅", "유입", "전환율", "CTR", "CVR", "CPV", "UA",
+                "user acquisition", "campaign", "ad spend", "channel", "marketer"));
+        put(Persona.PUBLISHER, Set.of(
+                "포트폴리오", "퍼블리셔", "퍼블리싱", "라이센싱", "라이센스", "IP",
+                "다음 출시작", "출시 윈도우", "publisher", "publishing", "licensing", "portfolio"));
+        put(Persona.INDIE, Set.of(
+                "내 게임", "우리 게임", "우리 인디", "우리 스튜디오", "내가 만들",
+                "차별화", "자본", "1인 개발", "소규모",
+                "indie", "my game", "differentiate", "small studio"));
+    }};
 
     private HardcodedSmallTalkFilter() {}
 
@@ -73,5 +99,23 @@ public final class HardcodedSmallTalkFilter {
     public static String offTopicResponse() {
         return "이 질문은 게임 시장 분석 영역 밖입니다. GTI는 게임/게임 산업 관련 질문에 답변하도록 설계되었습니다. "
                 + "예: 'CS2 동접자 추세는?', '인디 게임 마케팅 채널 추천'.";
+    }
+
+    /**
+     * W9 옵션 C — 페르소나 시그널 자동 감지 (정규식 fast-path).
+     *
+     * <p>매칭 X 면 null 반환 — 호출자가 LLM Layer 1 결과 또는 default INDIE 사용.
+     */
+    public static Persona detectPersonaSignal(String query) {
+        if (query == null || query.isBlank()) return null;
+        String normalized = query.toLowerCase();
+        for (Map.Entry<Persona, Set<String>> entry : PERSONA_SIGNALS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (normalized.contains(keyword.toLowerCase())) {
+                    return entry.getKey();
+                }
+            }
+        }
+        return null;
     }
 }

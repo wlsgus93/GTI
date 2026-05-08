@@ -1,5 +1,7 @@
 package com.gametrend.insight.application.agent;
 
+import com.gametrend.insight.domain.insight.Persona;
+
 /**
  * 사용자 query 의 의도/주제 분류 (3-Layer 하이브리드의 Layer 1).
  *
@@ -21,7 +23,24 @@ public interface IntentClassifier {
 
     Classification classify(String userQuery);
 
-    record Classification(Topic topic, Intent intent, double confidence, String reason) {
+    /**
+     * @param topic           대주제 (GAME / OFF_TOPIC / SMALL_TALK)
+     * @param intent          세부 의도 (NEW_QUERY / FOLLOW_UP / PERSONA_SWITCH / META / UNCLEAR)
+     * @param confidence      0.0~1.0
+     * @param reason          분류 근거 (디버그)
+     * @param inferredPersona 자동 추론된 페르소나 (W9 옵션 C — null = 추론 X / 명시 X)
+     */
+    record Classification(
+            Topic topic,
+            Intent intent,
+            double confidence,
+            String reason,
+            Persona inferredPersona) {
+
+        /** 페르소나 미추론 default 생성자 (구 callsite 호환). */
+        public Classification(Topic topic, Intent intent, double confidence, String reason) {
+            this(topic, intent, confidence, reason, null);
+        }
 
         public boolean shouldCallCloud() {
             return topic == Topic.GAME && intent != Intent.UNCLEAR;

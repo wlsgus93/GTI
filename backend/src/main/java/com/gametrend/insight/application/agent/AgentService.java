@@ -67,14 +67,23 @@ public class AgentService {
         // --- Step 1: 세션 ---
         ChatSessionJpaEntity session = resolveSession(userId, request);
 
-        // --- Step 2: Layer 1 분류 ---
+        // --- Step 2: Layer 1 분류 (W9 옵션 C — 페르소나 시그널 자동 감지 포함) ---
         Classification c = classifier.classify(request.query());
-        log.info("Layer 1 classification: topic={}, intent={}, confidence={}",
-                c.topic(), c.intent(), c.confidence());
+        log.info("Layer 1 classification: topic={}, intent={}, confidence={}, inferredPersona={}",
+                c.topic(), c.intent(), c.confidence(), c.inferredPersona());
+
+        // W9 옵션 C — 페르소나 자동 추론 시 chat_session.persona 갱신 (UI 가 morph 트리거)
+        boolean personaInferred = false;
+        Persona previousPersona = session.getPersona();
+        if (c.inferredPersona() != null && c.inferredPersona() != previousPersona) {
+            session.setPersona(c.inferredPersona());
+            personaInferred = true;
+            log.info("Persona auto-inferred: {} → {}", previousPersona, c.inferredPersona());
+        }
 
         // user 메시지 저장 (cloud 호출 여부와 무관)
         boolean willBlock = !c.shouldCallCloud();
-        ChatMessageJpaEntity userMsg = messageRepo.save(ChatMessageJpaEntity.userMessage(
+        messageRepo.save(ChatMessageJpaEntity.userMessage(
                 session.getId(), request.query(),
                 c.topic(), c.intent(), c.confidence(), willBlock));
 
@@ -87,7 +96,7 @@ public class AgentService {
             sessionRepo.save(session);
             long latencyMs = (System.nanoTime() - startNs) / 1_000_000;
             return AgentResponse.blocked(session.getId(), assistantMsg.getId(), content,
-                    c.topic(), c.intent(), latencyMs);
+                    c.topic(), c.intent(), latencyMs, session.getPersona());
         }
 
         // --- Step 4: Layer 2 — 컨텍스트 ---
@@ -97,7 +106,7 @@ public class AgentService {
                         session.getId(), PageRequest.of(0, CONTEXT_TURN_LIMIT))
                 : List.of();
 
-        // --- Step 5: Layer 3 — Cloud LLM ---
+        // --- Step 5: Layer 3 — Cloud LLM (현재 세션 persona 로 톤 분기) ---
         String systemPrompt = buildSystemPrompt(session.getPersona(), history);
         LlmResponse llmResp;
         try {
@@ -112,7 +121,8 @@ public class AgentService {
             sessionRepo.save(session);
             long latencyMs = (System.nanoTime() - startNs) / 1_000_000;
             return new AgentResponse(session.getId(), assistantMsg.getId(), fallback,
-                    c.topic(), c.intent(), false, "fallback", 0, 0, false, latencyMs);
+                    c.topic(), c.intent(), false, "fallback", 0, 0, false, latencyMs,
+                    session.getPersona(), personaInferred);
         }
 
         long latencyMs = (System.nanoTime() - startNs) / 1_000_000;
@@ -127,7 +137,8 @@ public class AgentService {
 
         return new AgentResponse(session.getId(), assistantMsg.getId(), llmResp.content(),
                 c.topic(), c.intent(), false, llmResp.model(),
-                llmResp.promptTokens(), llmResp.completionTokens(), false, latencyMs);
+                llmResp.promptTokens(), llmResp.completionTokens(), false, latencyMs,
+                session.getPersona(), personaInferred);
     }
 
     private ChatSessionJpaEntity resolveSession(Long userId, AgentRequest request) {

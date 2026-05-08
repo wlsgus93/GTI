@@ -3,6 +3,7 @@ package com.gametrend.insight.infrastructure.agent;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gametrend.insight.application.agent.IntentClassifier;
+import com.gametrend.insight.domain.insight.Persona;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -31,7 +32,7 @@ public final class LocalIntentClassifier implements IntentClassifier {
             너는 게임 시장 분석 도구의 의도 분류기다. 사용자 질문을 보고 JSON 한 줄만 출력해라.
 
             출력 schema:
-            {"topic":"GAME|OFF_TOPIC|SMALL_TALK","intent":"NEW_QUERY|FOLLOW_UP|PERSONA_SWITCH|META|UNCLEAR","confidence":0.0~1.0}
+            {"topic":"GAME|OFF_TOPIC|SMALL_TALK","intent":"NEW_QUERY|FOLLOW_UP|PERSONA_SWITCH|META|UNCLEAR","confidence":0.0~1.0,"persona":"INDIE|PUBLISHER|MARKETER|INVESTOR|null"}
 
             분류 기준:
             - topic=GAME: 게임/게임시장/게임산업/장르/플레이어수/매출/마케팅 관련
@@ -42,6 +43,13 @@ public final class LocalIntentClassifier implements IntentClassifier {
             - intent=PERSONA_SWITCH: 관점 변경 ("인디 개발자 입장에서는?")
             - intent=META: 도구 사용법 질문 ("어떻게 사용해?")
             - intent=UNCLEAR: 분류 모호
+
+            persona 시그널 (W9 옵션 C — Agentic UX):
+            - INDIE: "내 게임", "우리 인디", "차별화", "1인 개발", "indie", "my game"
+            - PUBLISHER: "포트폴리오", "퍼블리싱", "IP", "라이센싱", "다음 출시작"
+            - MARKETER: "캠페인", "광고", "ROI", "CTR/CVR/CPV", "유입", "채널"
+            - INVESTOR: "투자", "리스크", "성공 확률", "BEP", "수익", "벤처"
+            - null: 페르소나 시그널 없음 (모호한 일반 query)
 
             JSON 만 출력. 설명 X.
             """;
@@ -58,21 +66,30 @@ public final class LocalIntentClassifier implements IntentClassifier {
 
     @Override
     public Classification classify(String userQuery) {
+        // Step 0: hardcoded persona signal (W9 옵션 C — fast-path)
+        Persona signaled = HardcodedSmallTalkFilter.detectPersonaSignal(userQuery);
+
         // Step 1: hardcoded fast-path (LLM 호출 X)
         if (HardcodedSmallTalkFilter.isSmallTalk(userQuery)) {
-            return new Classification(Topic.SMALL_TALK, Intent.UNCLEAR, 1.0, "hardcoded smalltalk match");
+            return new Classification(Topic.SMALL_TALK, Intent.UNCLEAR, 1.0, "hardcoded smalltalk match", null);
         }
         if (HardcodedSmallTalkFilter.isMeta(userQuery)) {
-            return new Classification(Topic.GAME, Intent.META, 1.0, "meta keyword match");
+            return new Classification(Topic.GAME, Intent.META, 1.0, "meta keyword match", null);
         }
 
         // Step 2: local LLM JSON classification
         try {
-            return classifyWithLocalLlm(userQuery);
+            Classification llm = classifyWithLocalLlm(userQuery);
+            // hardcoded signal > LLM (정확도 ↑)
+            if (signaled != null && llm.inferredPersona() == null) {
+                return new Classification(llm.topic(), llm.intent(), llm.confidence(),
+                        llm.reason() + " + hardcoded persona", signaled);
+            }
+            return llm;
         } catch (RuntimeException e) {
             log.warn("Local classifier failed (fallback to UNCLEAR PASS): {}", e.getMessage());
             // 분류기 fail 시 → 보수적으로 GAME + UNCLEAR (cloud 로 보내되 호출자가 추가 검증 가능)
-            return new Classification(Topic.GAME, Intent.UNCLEAR, 0.3, "classifier fallback");
+            return new Classification(Topic.GAME, Intent.UNCLEAR, 0.3, "classifier fallback", signaled);
         }
     }
 
@@ -104,10 +121,20 @@ public final class LocalIntentClassifier implements IntentClassifier {
             Topic topic = parseTopic((String) parsed.get("topic"));
             Intent intent = parseIntent((String) parsed.get("intent"));
             double confidence = parsed.get("confidence") instanceof Number n ? n.doubleValue() : 0.5;
-            return new Classification(topic, intent, confidence, "local LLM");
+            Persona persona = parsePersona((String) parsed.get("persona"));
+            return new Classification(topic, intent, confidence, "local LLM", persona);
         } catch (Exception e) {
             log.warn("JSON parse failed for classifier output: {} — raw: {}", e.getMessage(), raw);
-            return new Classification(Topic.GAME, Intent.UNCLEAR, 0.3, "json parse failed");
+            return new Classification(Topic.GAME, Intent.UNCLEAR, 0.3, "json parse failed", null);
+        }
+    }
+
+    private static Persona parsePersona(String s) {
+        if (s == null || s.isBlank() || "null".equalsIgnoreCase(s.trim())) return null;
+        try {
+            return Persona.valueOf(s.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
