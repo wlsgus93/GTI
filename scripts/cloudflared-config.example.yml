@@ -1,0 +1,30 @@
+# Cloudflare Tunnel config — 배치 위치: %USERPROFILE%\.cloudflared\config.yml
+#
+# 사용 전 갱신:
+#   1. tunnel UUID 채우기 (cloudflared tunnel create gti-tunnel 후 발급)
+#   2. credentials-file 경로 갱신
+#   3. hostname 의 도메인 갱신 (자체 도메인 또는 cfargotunnel.com 부도메인)
+
+tunnel: <TUNNEL_UUID_HERE>
+credentials-file: C:\Users\jinhyun\.cloudflared\<TUNNEL_UUID_HERE>.json
+
+# 자동 재연결 안정화
+retries: 5
+loglevel: info
+
+ingress:
+  # === Backend Spring Boot API ===
+  - hostname: api.gti.your-domain.com
+    service: http://localhost:8080
+    originRequest:
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      noTLSVerify: true
+
+  # === Crawler Service (선택 — 외부 노출 안 해도 됨) ===
+  # 보통 backend 가 localhost:3001 직접 호출하므로 외부 노출 불필요.
+  # - hostname: crawler.gti.your-domain.com
+  #   service: http://localhost:3001
+
+  # === catch-all (필수 — 마지막) ===
+  - service: http_status:404

@@ -55,8 +55,17 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-# GTI 통합 config (LLM provider + external sources + JWT)
+# GTI 통합 config (LLM provider + external sources + JWT + CORS)
 gti:
+  cors:
+    # 콤마 구분 — Vercel 배포 시 운영 도메인 추가
+    # 예: GTI_ALLOWED_ORIGINS=https://gti-app.vercel.app,https://gti.example.com
+    allowed-origins: ${GTI_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173}
+  agent:
+    # 3-Layer Hybrid Agent — 분류기 토글 (hardcoded = 정규식만, local = Llama 1B Ollama)
+    classifier: ${GTI_AGENT_CLASSIFIER:hardcoded}
+    classifier-url: ${GTI_AGENT_CLASSIFIER_URL:http://localhost:11434}
+    classifier-model: ${GTI_AGENT_CLASSIFIER_MODEL:llama3.2:1b-instruct-q4_K_M}
   llm:
     # provider toggle: router (Gemini HIGH + Groq FAST) | gemini | groq | ollama | anthropic | stub
     provider: ${LLM_PROVIDER:stub}
