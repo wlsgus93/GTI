@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
@@ -7,6 +8,7 @@ import { Loading } from "@/components/AsyncState";
 import { Badge } from "@/components/ui/Badge";
 import { PersonaSwitcher } from "@/components/ui/PersonaSwitcher";
 import { SAMPLE_GAME_ID } from "@/constants/routes";
+import { pageTransition, pageTransitionConfig } from "@/design/motion";
 
 function sidebarItemActive(to: string, pathname: string, search: string): boolean {
   if (to === "/") {
@@ -58,7 +60,10 @@ export function MainLayout() {
   const { auth, isAuthenticated, logout } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--color-surface)]">
+    <div className="relative flex min-h-screen flex-col bg-[var(--color-surface)]">
+      {/* Iter 7 — Persona-Adaptive Mesh Gradient (페르소나에 따라 색상 자동 변환) */}
+      <div className="mesh-bg" aria-hidden="true" />
+
       <header className="sticky top-0 z-40 border-b border-[var(--color-line)] bg-[var(--color-surface-overlay)] backdrop-blur">
         <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <NavLink to="/" className="flex items-center gap-2">
@@ -180,7 +185,18 @@ export function MainLayout() {
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 lg:px-8">
             <Suspense fallback={<Loading label="페이지 로드 중…" />}>
-              <Outlet />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={pathname}
+                  variants={pageTransition}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={pageTransitionConfig}
+                >
+                  <Outlet />
+                </motion.div>
+              </AnimatePresence>
             </Suspense>
           </main>
           <AppFooter />

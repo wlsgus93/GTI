@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import { useAgentQuery } from "@/features/agent/hooks";
 import type {
@@ -5,6 +6,7 @@ import type {
   AgentTopic,
   AgentIntent,
 } from "@/features/agent/api";
+import { chatBubbleVariants, EASE_OUT_EXPO } from "@/design/motion";
 import { loadAuth } from "@/lib/api/token";
 
 type AgentPanelProps = {
@@ -45,9 +47,8 @@ export function AgentPanel({ open, onClose }: AgentPanelProps) {
     }
   }, [turns]);
 
-  if (!open) {
-    return null;
-  }
+  // AgentPanel — AnimatePresence 로 slide-in 처리
+  if (!open) return null;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -92,8 +93,12 @@ export function AgentPanel({ open, onClose }: AgentPanelProps) {
   };
 
   return (
-    <aside
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
+    <motion.aside
+      initial={{ x: "100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "100%", opacity: 0 }}
+      transition={{ duration: 0.36, ease: EASE_OUT_EXPO }}
+      className="glass-card fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-white/10 shadow-2xl"
       aria-label="에이전트 패널"
     >
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
@@ -126,13 +131,17 @@ export function AgentPanel({ open, onClose }: AgentPanelProps) {
             출시 적기?&rdquo;
           </p>
         )}
+        <AnimatePresence initial={false}>
         {turns.map((t, i) => (
-          <div
+          <motion.div
             key={i}
+            variants={chatBubbleVariants(t.role)}
+            initial="hidden"
+            animate="visible"
             className={
               t.role === "user"
-                ? "self-end max-w-[85%] rounded-lg bg-blue-600 px-3 py-2 text-white"
-                : "self-start max-w-[90%] rounded-lg bg-zinc-100 px-3 py-2 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100"
+                ? "self-end max-w-[85%] rounded-lg bg-[var(--color-accent)] px-3 py-2 text-white shadow-md"
+                : "self-start max-w-[90%] rounded-lg bg-zinc-100 px-3 py-2 text-zinc-900 dark:bg-zinc-900/80 dark:text-zinc-100"
             }
           >
             <div className="whitespace-pre-wrap">{t.content}</div>
@@ -160,12 +169,18 @@ export function AgentPanel({ open, onClose }: AgentPanelProps) {
                 </span>
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
+        </AnimatePresence>
         {isPending && (
-          <div className="self-start rounded-lg bg-zinc-100 px-3 py-2 text-zinc-500 dark:bg-zinc-900">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+            className="self-start rounded-lg bg-zinc-100 px-3 py-2 text-zinc-500 dark:bg-zinc-900"
+          >
             응답 생성 중...
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -184,12 +199,12 @@ export function AgentPanel({ open, onClose }: AgentPanelProps) {
         />
         <button
           type="submit"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="btn-micro rounded-lg bg-[var(--color-accent)] px-4 py-2 font-medium text-white shadow-lg disabled:opacity-50"
           disabled={!isAuthed || isPending || !draft.trim()}
         >
           전송
         </button>
       </form>
-    </aside>
+    </motion.aside>
   );
 }

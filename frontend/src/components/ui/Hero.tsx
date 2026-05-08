@@ -37,7 +37,7 @@ export function Hero({ eyebrow, title, subtitle, trailing, accentBackground = fa
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="text-[length:var(--text-headline)] font-bold leading-[1.05] tracking-tight text-[var(--color-ink)]">
+          <h1 className="text-[length:var(--text-headline)] font-bold leading-[1.05] tracking-tight kinetic-text">
             {title}
           </h1>
           {subtitle ? (

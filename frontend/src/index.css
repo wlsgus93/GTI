@@ -142,6 +142,112 @@ body {
   );
 }
 
+/* ============================================================
+ * Iter 7 — Cybernetic Bento + Persona-Adaptive Mesh
+ * ============================================================ */
+
+/* 페르소나 mesh — <html data-persona="indie|publisher|marketer|investor"> 기반 */
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 18% 22%, var(--mesh-color-a) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 45% at 82% 78%, var(--mesh-color-b) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 100%, var(--mesh-color-c) 0%, transparent 70%);
+  filter: blur(40px) saturate(1.1);
+  opacity: 0.85;
+  transition: opacity 0.6s var(--ease-out-expo);
+}
+
+/* 페르소나별 mesh 색상 — data-persona attr 매칭 */
+[data-persona="indie"] {
+  --mesh-color-a: oklch(62% 0.13 165 / 0.35);   /* sage green */
+  --mesh-color-b: oklch(70% 0.12 130 / 0.25);   /* warm green */
+  --mesh-color-c: oklch(55% 0.10 200 / 0.18);   /* cool teal */
+}
+[data-persona="publisher"] {
+  --mesh-color-a: oklch(58% 0.16 285 / 0.40);   /* indigo */
+  --mesh-color-b: oklch(62% 0.18 320 / 0.28);   /* violet */
+  --mesh-color-c: oklch(50% 0.14 250 / 0.20);   /* deep blue */
+}
+[data-persona="marketer"] {
+  --mesh-color-a: oklch(64% 0.16 35 / 0.40);    /* terracotta */
+  --mesh-color-b: oklch(68% 0.18 10 / 0.28);    /* warm pink */
+  --mesh-color-c: oklch(60% 0.14 60 / 0.20);    /* amber */
+}
+[data-persona="investor"] {
+  --mesh-color-a: oklch(76% 0.16 75 / 0.32);    /* amber pulse */
+  --mesh-color-b: oklch(45% 0.10 230 / 0.30);   /* graphite blue */
+  --mesh-color-c: oklch(55% 0.12 195 / 0.18);   /* steel teal */
+}
+
+/* mesh idle drift animation — 매우 미세 (UX 방해 X) */
+@keyframes meshDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(2%, -1.5%) scale(1.04); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.mesh-bg::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background: inherit;
+  filter: inherit;
+  animation: meshDrift 24s ease-in-out infinite;
+}
+
+/* Glassmorphism — 카드 시그니처 */
+.glass-card {
+  background: color-mix(in oklch, var(--color-surface-raised) 65%, transparent);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid color-mix(in oklch, var(--color-line) 60%, transparent);
+  transition: all 0.32s var(--ease-out-expo);
+}
+
+.glass-card:hover {
+  border-color: color-mix(in oklch, var(--color-accent) 50%, transparent);
+  transform: translateY(-3px);
+  box-shadow:
+    0 18px 36px -12px color-mix(in oklch, var(--color-accent) 25%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--color-accent) 20%, transparent);
+}
+
+/* hero kinetic — gradient text */
+.kinetic-text {
+  background: linear-gradient(
+    135deg,
+    var(--color-ink) 0%,
+    var(--color-ink) 40%,
+    color-mix(in oklch, var(--color-accent) 90%, var(--color-ink)) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.025em;
+}
+
+/* glow — accent 강조 (CommandBar focus 등) */
+.glow-accent:focus-within {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--color-accent) 25%, transparent),
+    0 0 28px -4px color-mix(in oklch, var(--color-accent) 40%, transparent);
+}
+
+/* micro button — scale + cubic-bezier (Tailwind 보조) */
+.btn-micro {
+  transition: transform 0.18s var(--ease-out-expo), box-shadow 0.32s var(--ease-out-expo);
+}
+.btn-micro:hover {
+  transform: translateY(-1px);
+}
+.btn-micro:active {
+  transform: translateY(0) scale(0.98);
+}
+
 /* utility: editorial accent text */
 .text-accent {
   color: var(--color-accent-strong);

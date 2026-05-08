@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
@@ -8,6 +9,7 @@ import { Hero } from "@/components/ui/Hero";
 import { Stat } from "@/components/ui/Stat";
 import { ConfidenceMeta } from "@/components/viz/ConfidenceMeta";
 import { usePersonaTheme } from "@/design/PersonaThemeContext";
+import { staggerContainer, staggerItem } from "@/design/motion";
 import { useTrends } from "@/features/trend/hooks";
 import type { TrendBoardItem } from "@/features/trend/api";
 import { useAddWatchlist } from "@/features/watchlist/hooks";
@@ -106,17 +108,22 @@ export function TrendBoardPage() {
         <>
           {hero ? <HeroGameCard game={hero} /> : null}
           {secondary.length > 0 ? (
-            <section
+            <motion.section
               aria-labelledby="secondary-heading"
               className="grid gap-4 sm:grid-cols-2"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
             >
               <h2 id="secondary-heading" className="sr-only">
                 Top 2~5
               </h2>
               {secondary.map((g) => (
-                <SecondaryGameCard key={g.id} game={g} />
+                <motion.div key={g.id} variants={staggerItem}>
+                  <SecondaryGameCard game={g} />
+                </motion.div>
               ))}
-            </section>
+            </motion.section>
           ) : null}
           {list.length > 0 ? (
             <section aria-labelledby="list-heading">
