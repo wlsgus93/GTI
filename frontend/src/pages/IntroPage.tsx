@@ -40,7 +40,11 @@ const STATS = [
 export function IntroPage() {
   const { isAuthenticated } = useAuth();
   const reduced = useReducedMotion();
-  const [skipped, setSkipped] = useState(false);
+  // 재방문 (이미 본 사용자) 또는 모션 줄임 → frame 3 즉시
+  const [skipped, setSkipped] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("gti.seen-intro") === "true";
+  });
 
   // 인증된 사용자 → 즉시 / 로 (이미 가입자 — 인트로 보고 싶으면 명시 진입)
   useEffect(() => {

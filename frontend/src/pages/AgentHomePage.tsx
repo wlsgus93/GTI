@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { useAuth } from "@/auth/AuthContext";
 import { useAgentQuery } from "@/features/agent/hooks";
 import type { AgentResponse } from "@/features/agent/api";
@@ -54,13 +54,10 @@ export function AgentHomePage() {
     inputRef.current?.focus();
   }, []);
 
-  // 미인증 시 — 첫 방문자는 /intro 자동, 재방문자는 가입 유도 hero
+  // 미인증 시 → 무조건 /intro 로 (Navigate 컴포넌트 — 렌더 중 안전)
+  // intro 본 사용자는 IntroPage 의 "건너뛰기" 또는 "시작하기" 로 진행
   if (!isAuthenticated) {
-    if (typeof window !== "undefined" && !window.localStorage.getItem("gti.seen-intro")) {
-      navigate("/intro", { replace: true });
-      return null;
-    }
-    return <UnauthenticatedHero />;
+    return <Navigate to="/intro" replace />;
   }
 
   const handleSubmit = (e?: FormEvent) => {
@@ -284,51 +281,5 @@ export function AgentHomePage() {
   );
 }
 
-/** 미인증 사용자용 hero — 가입 유도 */
-function UnauthenticatedHero() {
-  const { theme } = usePersonaTheme();
-  return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-6 text-center">
-      <motion.h1
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: EASE_OUT_EXPO }}
-        className="kinetic-text text-[clamp(2rem,1.4rem+3vw,4rem)] font-bold leading-[1.05] tracking-tight"
-      >
-        게임 시장 분석<br />에이전트와 함께
-      </motion.h1>
-      <motion.p
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.4, ease: EASE_OUT_EXPO }}
-        className="max-w-md text-[var(--color-ink-muted)]"
-      >
-        9 소스 데이터 · 4 이해관계자 관점 · LLM 인사이트.
-        <br />
-        가입 후 자연어로 질문하면 시스템이 당신의 관점을 자동 파악합니다.
-      </motion.p>
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.4, ease: EASE_OUT_EXPO }}
-        className="flex gap-3"
-      >
-        <Link
-          to="/signup"
-          className="btn-micro rounded-[var(--radius-input)] bg-[var(--color-accent)] px-6 py-3 text-sm font-semibold text-white shadow-lg"
-        >
-          시작하기 →
-        </Link>
-        <Link
-          to="/login"
-          className="btn-micro rounded-[var(--radius-input)] border border-[var(--color-line)] px-6 py-3 text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-        >
-          로그인
-        </Link>
-      </motion.div>
-      <p className="text-xs text-[var(--color-ink-subtle)]">
-        현재 기본 관점: <span className="text-[var(--color-accent-strong)]">{theme.label}</span>
-      </p>
-    </div>
-  );
-}
+
+// W9 Phase E — UnauthenticatedHero 제거. 미인증은 무조건 /intro 로 redirect.
