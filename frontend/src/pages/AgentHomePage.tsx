@@ -54,8 +54,12 @@ export function AgentHomePage() {
     inputRef.current?.focus();
   }, []);
 
-  // 미인증 시 가입 유도
+  // 미인증 시 — 첫 방문자는 /intro 자동, 재방문자는 가입 유도 hero
   if (!isAuthenticated) {
+    if (typeof window !== "undefined" && !window.localStorage.getItem("gti.seen-intro")) {
+      navigate("/intro", { replace: true });
+      return null;
+    }
     return <UnauthenticatedHero />;
   }
 

@@ -198,6 +198,36 @@ body {
   animation: meshDrift 24s ease-in-out infinite;
 }
 
+/* IntroPage cinematic mesh — 더 강렬, 더 동적 (Iter 9 Phase E) */
+.intro-mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 60% at 25% 20%, var(--mesh-color-a) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 75% 80%, var(--mesh-color-b) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, var(--mesh-color-c) 0%, transparent 65%);
+  filter: blur(60px) saturate(1.2);
+  opacity: 0.95;
+}
+.intro-mesh-bg::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: inherit;
+  filter: inherit;
+  animation: meshDrift 14s ease-in-out infinite;
+}
+.intro-mesh-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, var(--color-surface) 95%);
+  pointer-events: none;
+}
+
 /* Glassmorphism — 카드 시그니처 */
 .glass-card {
   background: color-mix(in oklch, var(--color-surface-raised) 65%, transparent);

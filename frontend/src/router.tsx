@@ -12,6 +12,15 @@ import { AgentHomePage } from "@/pages/AgentHomePage";
  */
 export const router = createBrowserRouter([
   {
+    // W9 Phase E — Cinematic Intro (영화 오프닝 톤)
+    // 첫 방문자 + 미인증 시 / → /intro 자동 redirect (router 레벨 X — IntroGate 컴포넌트로)
+    path: "/intro",
+    lazy: async () => {
+      const m = await import("@/pages/IntroPage");
+      return { Component: m.IntroPage };
+    },
+  },
+  {
     path: "/login",
     lazy: async () => {
       const m = await import("@/pages/LoginPlaceholderPage");
