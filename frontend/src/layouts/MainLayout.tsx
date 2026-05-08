@@ -73,8 +73,9 @@ export function MainLayout() {
             </Badge>
           </NavLink>
           <div className="ml-auto flex flex-wrap items-center gap-3">
-            <div className="hidden lg:block">
-              <PersonaSwitcher variant="compact" />
+            {/* W9 옵션 C — 작은 뱃지 (자동 추론 메타 표시 + 클릭 시 명시 변경) */}
+            <div className="hidden md:block">
+              <PersonaSwitcher variant="badge" />
             </div>
             <button
               type="button"
